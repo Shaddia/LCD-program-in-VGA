@@ -1,0 +1,124 @@
+library ieee ;
+use ieee.std_logic_1164.all;
+
+-----------------------------------------------------
+
+entity lcdez is
+port(clk:		in std_logic;    --Clock to keep trak of time
+	lcd:		out std_logic_vector(7 downto 0);  --LCD data pins
+	enviar : out std_logic;    --Send signal
+	rs:		out std_logic;    --Data or command
+	rw: out std_logic    --read/write
+);
+end lcdez;
+
+-----------------------------------------------------
+
+architecture FSM of lcdez is
+    type state_type is (encender, configpantalla,encenderdisplay, limpiardisplay, configcursor,listo,fin);    --Define dfferent states to control the LCD
+    signal estado: state_type;
+	 constant milisegundos: integer := 50000;
+	 constant microsegundos: integer := 50;
+begin
+  comb_logic: process(clk)
+  variable contar: integer := 0;
+  begin
+	if (clk'event and clk='1') then
+	  case estado is
+	    when encender =>
+		  if (contar < 50*milisegundos) then    --Wait for the LCD to start all its components
+				contar := contar + 1;
+				estado <= encender;
+			else
+				enviar <= '0';
+				contar := 0; 
+				estado <= configpantalla;
+			end if;
+			--From this point we will send diffrent configuration commands as shown in class
+			--You should check the manual to understand what configurations we are sending to
+			--The display. You have to wait between each command for the LCD to take configurations.
+	    when configpantalla =>
+			if (contar = 0) then
+				contar := contar +1;
+				rs <= '0';
+				rw <= '0';
+				lcd <= "00111000";
+				enviar <= '1';
+				estado <= configpantalla;
+			elsif (contar < 1*milisegundos) then
+				contar := contar + 1;
+				estado <= configpantalla;
+			else
+				enviar <= '0';
+				contar := 0;
+				estado <= encenderdisplay;
+			end if;
+	    when encenderdisplay =>
+			if (contar = 0) then
+				contar := contar +1;
+				lcd <= "00001111";				
+				enviar <= '1';
+				estado <= encenderdisplay;
+			elsif (contar < 1*milisegundos) then
+				contar := contar + 1;
+				estado <= encenderdisplay;
+			else
+				enviar <= '0';
+				contar := 0;
+				estado <= limpiardisplay;
+			end if;
+	    when limpiardisplay =>	
+			if (contar = 0) then
+				contar := contar +1;
+				lcd <= "00000001";				
+				enviar <= '1';
+				estado <= limpiardisplay;
+			elsif (contar < 1*milisegundos) then
+				contar := contar + 1;
+				estado <= limpiardisplay;
+			else
+				enviar <= '0';
+				contar := 0;
+				estado <= configcursor;
+			end if;
+	    when configcursor =>	
+			if (contar = 0) then
+				contar := contar +1;
+				lcd <= "00000100";				
+				enviar <= '1';
+				estado <= configcursor;
+			elsif (contar < 1*milisegundos) then
+				contar := contar + 1;
+				estado <= configcursor;
+			else
+				enviar <= '0';
+				contar := 0;
+				estado <= listo;
+			end if;
+			--The display is now configured now it you just can send data to de LCD 
+			--In this example we are just sending letter A, for this project you
+			--Should make it variable for what has been pressed on the keyboard.
+	    when listo =>	
+			if (contar = 0) then
+				rs <= '1';
+				rw <= '0';
+				enviar <= '1';
+				lcd <= "01000001"; -- ascii de A
+				contar := contar +1;
+				estado <= listo;
+			elsif (contar < 1*milisegundos) then
+				contar := contar + 1;
+				estado <= listo;
+			else
+				enviar <= '0';
+				contar := 0;
+				estado <= fin;
+			end if;
+		  when fin =>
+			estado <= fin;
+	    when others =>
+			estado <= encender;
+	  end case;
+	end if;
+ end process;
+end FSM;
